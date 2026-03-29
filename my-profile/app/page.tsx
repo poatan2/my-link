@@ -81,7 +81,7 @@ export default function Home() {
       <div className="w-full max-w-6xl grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
         
         {/* Left Column: Profile Card */}
-        <div className="md:col-span-5 lg:col-span-4 sticky top-10">
+        <div className="md:col-span-5 lg:col-span-4 md:sticky md:top-10">
           <div className="bg-yellow-300 border-4 border-black p-6 sm:p-8 rounded-xl shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] transition-transform hover:-translate-y-1 hover:shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] flex flex-col items-center border-[6px]">
             {/* Avatar */}
             <div className="w-40 h-40 sm:w-48 sm:h-48 border-4 border-black rounded-full overflow-hidden shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] mb-6 bg-white shrink-0">
