@@ -1,12 +1,49 @@
 "use client";
 
-import { DUMMY_LINKS } from "@/data/links";
+import { useState } from "react";
+import { DUMMY_LINKS, LinkItem } from "@/data/links";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import * as PhosphorIcons from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 
 export default function Home() {
-  const visibleLinks = DUMMY_LINKS.filter(link => link.isVisible).sort((a, b) => a.order - b.order);
+  // Use React local state to manage the links dynamically
+  const [links, setLinks] = useState<LinkItem[]>(DUMMY_LINKS);
+  
+  // Dialog (Modal) state for adding a new link
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newUrl, setNewUrl] = useState("");
+
+  const visibleLinks = links.filter(link => link.isVisible).sort((a, b) => a.order - b.order);
+
+  // Function to handle adding a new link
+  const handleAddLink = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTitle.trim() || !newUrl.trim()) return;
+
+    // A simple URL validation fallback if one types URL without http
+    const formattedUrl = newUrl.startsWith("http") ? newUrl : `https://${newUrl}`;
+
+    const newLink: LinkItem = {
+      id: Date.now().toString(),
+      title: newTitle,
+      url: formattedUrl,
+      isVisible: true,
+      order: links.length,
+      animation: "none",
+      icon: "Link", // Default icon indicating it's a web link
+    };
+
+    setLinks([...links, newLink]);
+    setNewTitle("");
+    setNewUrl("");
+    setIsDialogOpen(false);
+  };
 
   return (
     // Ultra-clean minimal light background
@@ -26,11 +63,55 @@ export default function Home() {
               크리에이터를 위한 프리미엄 마이링크
             </p>
           </div>
+
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="w-full mt-4 font-semibold shadow-sm transition-all duration-300 hover:-translate-y-0.5">
+                <PhosphorIcons.Plus className="mr-2 h-4 w-4" weight="bold" />
+                새로운 링크 추가하기
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md p-6 bg-white border-zinc-200">
+              <DialogHeader>
+                <DialogTitle className="text-zinc-900 text-xl font-bold tracking-tight">새 링크 추가</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleAddLink} className="space-y-5 pt-4">
+                <div className="space-y-2.5">
+                  <Label htmlFor="title" className="text-zinc-700 font-semibold">링크 제목</Label>
+                  <Input 
+                    id="title" 
+                    placeholder="예: 내 포트폴리오 웹사이트" 
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    className="border-zinc-300 focus-visible:ring-zinc-500"
+                    required
+                  />
+                </div>
+                <div className="space-y-2.5">
+                  <Label htmlFor="url" className="text-zinc-700 font-semibold">URL 주소</Label>
+                  <Input 
+                    id="url" 
+                    type="text"
+                    placeholder="https://example.com" 
+                    value={newUrl}
+                    onChange={(e) => setNewUrl(e.target.value)}
+                    className="border-zinc-300 focus-visible:ring-zinc-500"
+                    required
+                  />
+                </div>
+                <div className="pt-2 flex justify-end gap-3">
+                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="border-zinc-200 text-zinc-700">취소</Button>
+                  <Button type="submit" className="bg-zinc-900 text-zinc-50 hover:bg-zinc-800">추가 완료</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+
         </header>
 
         <div className="flex flex-col gap-4">
           {visibleLinks.map((link) => {
-            const IconComponent = link.icon ? PhosphorIcons[link.icon as keyof typeof PhosphorIcons] as React.ElementType : null;
+            const IconComponent = link.icon ? PhosphorIcons[link.icon as keyof typeof PhosphorIcons] as React.ElementType || PhosphorIcons.Link : PhosphorIcons.Link;
 
             return (
               <a 
@@ -38,7 +119,7 @@ export default function Home() {
                 href={link.url} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 rounded-xl block"
+                className="group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 rounded-xl block animate-in fade-in zoom-in-95 duration-300 slide-in-from-bottom-2"
               >
                 <Card className={cn(
                   "overflow-hidden transition-all duration-300 md:hover:-translate-y-1 active:translate-y-0",
