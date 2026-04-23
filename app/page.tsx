@@ -14,6 +14,9 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
 // Zod Schema Definition
 const linkSchema = z.object({
   title: z.string().min(1, { message: "링크 제목을 입력해주세요." }),
@@ -41,23 +44,38 @@ export default function Home() {
 
   const visibleLinks = links.filter(link => link.isVisible).sort((a, b) => a.order - b.order);
 
-  const onSubmit = (data: LinkFormValues) => {
+  const onSubmit = async (data: LinkFormValues) => {
     const urlTrimmed = data.url.trim();
     const formattedUrl = urlTrimmed.startsWith("http") ? urlTrimmed : `https://${urlTrimmed}`;
 
-    const newLink: LinkItem = {
-      id: Date.now().toString(),
-      title: data.title.trim(),
-      url: formattedUrl,
-      isVisible: true,
-      order: links.length,
-      animation: "none",
-      icon: "Link",
-    };
+    try {
+      const docRef = await addDoc(collection(db, "users/anonymous/links"), {
+        title: data.title.trim(),
+        url: formattedUrl,
+        isVisible: true,
+        order: links.length,
+        animation: "none",
+        icon: "Link",
+        createdAt: serverTimestamp(),
+      });
 
-    setLinks([...links, newLink]);
-    form.reset();
-    setIsDialogOpen(false);
+      const newLink: LinkItem = {
+        id: docRef.id,
+        title: data.title.trim(),
+        url: formattedUrl,
+        isVisible: true,
+        order: links.length,
+        animation: "none",
+        icon: "Link",
+      };
+
+      setLinks([...links, newLink]);
+      form.reset();
+      setIsDialogOpen(false);
+    } catch (e) {
+      console.error("Error adding document: ", e);
+      alert("링크 추가 중 오류가 발생했습니다.");
+    }
   };
 
   const handleOpenChange = (open: boolean) => {
@@ -86,11 +104,11 @@ export default function Home() {
           </div>
 
           <Dialog open={isDialogOpen} onOpenChange={handleOpenChange}>
-            <DialogTrigger asChild>
-              <Button className="w-full mt-4 font-semibold shadow-sm transition-all duration-300 hover:-translate-y-0.5">
-                <PhosphorIcons.Plus className="mr-2 h-4 w-4" weight="bold" />
-                새로운 링크 추가하기
-              </Button>
+            <DialogTrigger 
+              render={<Button className="w-full mt-4 font-semibold shadow-sm transition-all duration-300 hover:-translate-y-0.5" />}
+            >
+              <PhosphorIcons.Plus className="mr-2 h-4 w-4" weight="bold" />
+              새로운 링크 추가하기
             </DialogTrigger>
             <DialogContent className="sm:max-w-md p-6 bg-white border-zinc-200">
               <DialogHeader>
