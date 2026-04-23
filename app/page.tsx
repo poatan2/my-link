@@ -10,43 +10,64 @@ import { Label } from "@/components/ui/label";
 import * as PhosphorIcons from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+// Zod Schema Definition
+const linkSchema = z.object({
+  title: z.string().min(1, { message: "링크 제목을 입력해주세요." }),
+  url: z.string()
+    .min(1, { message: "URL 주소를 입력해주세요." })
+    .refine((val) => {
+      // Validate string to be roughly a URL or localhost
+      const urlTrimmed = val.trim();
+      const urlPattern = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/i;
+      return urlPattern.test(urlTrimmed) || urlTrimmed.includes("localhost");
+    }, { message: "올바른 URL 형식이 아닙니다." })
+});
+
+type LinkFormValues = z.infer<typeof linkSchema>;
+
 export default function Home() {
-  // Use React local state to manage the links dynamically
   const [links, setLinks] = useState<LinkItem[]>(DUMMY_LINKS);
-  
-  // Dialog (Modal) state for adding a new link
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
-  const [newUrl, setNewUrl] = useState("");
+
+  // React Hook Form implementation
+  const form = useForm<LinkFormValues>({
+    resolver: zodResolver(linkSchema),
+    defaultValues: { title: "", url: "" },
+  });
 
   const visibleLinks = links.filter(link => link.isVisible).sort((a, b) => a.order - b.order);
 
-  // Function to handle adding a new link
-  const handleAddLink = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTitle.trim() || !newUrl.trim()) return;
-
-    // A simple URL validation fallback if one types URL without http
-    const formattedUrl = newUrl.startsWith("http") ? newUrl : `https://${newUrl}`;
+  const onSubmit = (data: LinkFormValues) => {
+    const urlTrimmed = data.url.trim();
+    const formattedUrl = urlTrimmed.startsWith("http") ? urlTrimmed : `https://${urlTrimmed}`;
 
     const newLink: LinkItem = {
       id: Date.now().toString(),
-      title: newTitle,
+      title: data.title.trim(),
       url: formattedUrl,
       isVisible: true,
       order: links.length,
       animation: "none",
-      icon: "Link", // Default icon indicating it's a web link
+      icon: "Link",
     };
 
     setLinks([...links, newLink]);
-    setNewTitle("");
-    setNewUrl("");
+    form.reset();
     setIsDialogOpen(false);
   };
 
+  const handleOpenChange = (open: boolean) => {
+    setIsDialogOpen(open);
+    if (!open) {
+      form.reset();
+    }
+  };
+
   return (
-    // Ultra-clean minimal light background
     <main className="flex min-h-svh flex-col items-center p-6 bg-zinc-50 text-zinc-900 overflow-hidden">
       <div className="w-full max-w-md space-y-10 mt-16 mb-24 relative z-10">
         <header className="text-center space-y-5">
@@ -64,7 +85,7 @@ export default function Home() {
             </p>
           </div>
 
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <Dialog open={isDialogOpen} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
               <Button className="w-full mt-4 font-semibold shadow-sm transition-all duration-300 hover:-translate-y-0.5">
                 <PhosphorIcons.Plus className="mr-2 h-4 w-4" weight="bold" />
@@ -75,35 +96,51 @@ export default function Home() {
               <DialogHeader>
                 <DialogTitle className="text-zinc-900 text-xl font-bold tracking-tight">새 링크 추가</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleAddLink} className="space-y-5 pt-4">
+              
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5 pt-4">
                 <div className="space-y-2.5">
-                  <Label htmlFor="title" className="text-zinc-700 font-semibold">링크 제목</Label>
+                  <Label htmlFor="title" className={cn("font-semibold", form.formState.errors.title ? "text-red-500" : "text-zinc-700")}>
+                    링크 제목
+                  </Label>
                   <Input 
                     id="title" 
                     placeholder="예: 내 포트폴리오 웹사이트" 
-                    value={newTitle}
-                    onChange={(e) => setNewTitle(e.target.value)}
-                    className="border-zinc-300 focus-visible:ring-zinc-500"
-                    required
+                    {...form.register("title")}
+                    className={cn(
+                      "focus-visible:ring-zinc-500", 
+                      form.formState.errors.title ? "border-red-500 focus-visible:ring-red-500" : "border-zinc-300"
+                    )}
                   />
+                  {form.formState.errors.title && (
+                    <p className="text-xs text-red-500 font-medium px-0.5">{form.formState.errors.title.message}</p>
+                  )}
                 </div>
+                
                 <div className="space-y-2.5">
-                  <Label htmlFor="url" className="text-zinc-700 font-semibold">URL 주소</Label>
+                  <Label htmlFor="url" className={cn("font-semibold", form.formState.errors.url ? "text-red-500" : "text-zinc-700")}>
+                    URL 주소
+                  </Label>
                   <Input 
                     id="url" 
                     type="text"
                     placeholder="https://example.com" 
-                    value={newUrl}
-                    onChange={(e) => setNewUrl(e.target.value)}
-                    className="border-zinc-300 focus-visible:ring-zinc-500"
-                    required
+                    {...form.register("url")}
+                    className={cn(
+                      "focus-visible:ring-zinc-500", 
+                      form.formState.errors.url ? "border-red-500 focus-visible:ring-red-500" : "border-zinc-300"
+                    )}
                   />
+                  {form.formState.errors.url && (
+                    <p className="text-xs text-red-500 font-medium px-0.5">{form.formState.errors.url.message}</p>
+                  )}
                 </div>
+                
                 <div className="pt-2 flex justify-end gap-3">
-                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)} className="border-zinc-200 text-zinc-700">취소</Button>
+                  <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} className="border-zinc-200 text-zinc-700">취소</Button>
                   <Button type="submit" className="bg-zinc-900 text-zinc-50 hover:bg-zinc-800">추가 완료</Button>
                 </div>
               </form>
+
             </DialogContent>
           </Dialog>
 
@@ -123,7 +160,6 @@ export default function Home() {
               >
                 <Card className={cn(
                   "overflow-hidden transition-all duration-300 md:hover:-translate-y-1 active:translate-y-0",
-                  // Minimal light styling
                   "border border-zinc-200 bg-white shadow-sm",
                   "hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-md",
                   link.animation === "pulse" && "animate-pulse hover:animate-none",
