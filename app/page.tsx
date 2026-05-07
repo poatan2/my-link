@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { LinkItem } from "@/data/links";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,26 +46,21 @@ const linkSchema = z.object({
 type LinkFormValues = z.infer<typeof linkSchema>;
 
 export default function Home() {
-  const [links, setLinks] = useState<LinkItem[]>([]);
+  const queryClient = useQueryClient();
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isAdding, setIsAdding] = useState(false);
   const [deletingLink, setDeletingLink] = useState<LinkItem | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [bio, setBio] = useState<string>("");
   const [originalBio, setOriginalBio] = useState<string>("");
   const [isEditingBio, setIsEditingBio] = useState(false);
-  const [isUpdatingBio, setIsUpdatingBio] = useState(false);
   const [displayName, setDisplayName] = useState<string>("");
   const [originalDisplayName, setOriginalDisplayName] = useState<string>("");
   const [isEditingName, setIsEditingName] = useState(false);
-  const [isUpdatingName, setIsUpdatingName] = useState(false);
   const [username, setUsername] = useState<string>("");
   const [originalUsername, setOriginalUsername] = useState<string>("");
   const [isEditingUsername, setIsEditingUsername] = useState(false);
-  const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
 
   // React Hook Form implementation
   const form = useForm<LinkFormValues>({
@@ -111,201 +108,149 @@ export default function Home() {
   };
 
   const handleCopyProfileLink = () => {
-    if (!user) return;
-    // 임시로 user.uid를 경로로 사용
-    const profileUrl = `${window.location.origin}/${user.uid}`;
+    if (!user || !displayName) return;
+    const profileUrl = `${window.location.origin}/${displayName}`;
     navigator.clipboard.writeText(profileUrl)
       .then(() => toast.success("프로필 링크가 복사되었습니다!"))
       .catch((err) => console.error("Failed to copy link: ", err));
   };
 
-  const fetchLinks = async (uid: string) => {
-    setIsLoading(true);
-    try {
-      const q = query(
-        collection(db, `users/${uid}/links`),
-        orderBy("createdAt", "desc")
-      );
-      const snapshot = await getDocs(q);
-      const fetchedLinks = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data
-        } as LinkItem;
-      });
-      setLinks(fetchedLinks);
-    } catch (error) {
-      console.error("Error fetching links: ", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchUserProfile = async (uid: string) => {
-    try {
-      const docRef = doc(db, "users", uid);
+  const { data: userProfile, isLoading: isProfileLoading } = useQuery({
+    queryKey: ['userProfile', user?.uid],
+    queryFn: async () => {
+      if (!user) return null;
+      const docRef = doc(db, "users", user.uid);
       const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (data.username) {
-          setUsername(data.username);
-          setOriginalUsername(data.username);
-        }
-        if (data.bio) {
-          setBio(data.bio);
-          setOriginalBio(data.bio);
-        }
-        if (data.displayName) {
-          setDisplayName(data.displayName);
-          setOriginalDisplayName(data.displayName);
-        }
-      } else {
-        setBio("한 줄 소개를 입력해주세요");
-        setOriginalBio("한 줄 소개를 입력해주세요");
-      }
-    } catch (error) {
-      console.error("Error fetching user profile: ", error);
-    }
-  };
+      return docSnap.exists() ? docSnap.data() : null;
+    },
+    enabled: !!user,
+  });
+
+  const { data: links = [], isLoading: isLinksLoading } = useQuery({
+    queryKey: ['links', user?.uid],
+    queryFn: async () => {
+      if (!user) return [];
+      const q = query(collection(db, `users/${user.uid}/links`), orderBy("createdAt", "desc"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as LinkItem));
+    },
+    enabled: !!user,
+  });
 
   useEffect(() => {
-    if (user) {
+    if (userProfile) {
+      if (userProfile.username) {
+        setUsername(userProfile.username);
+        setOriginalUsername(userProfile.username);
+      }
+      if (userProfile.displayName) {
+        setDisplayName(userProfile.displayName);
+        setOriginalDisplayName(userProfile.displayName);
+      }
+      if (userProfile.bio) {
+        setBio(userProfile.bio);
+        setOriginalBio(userProfile.bio);
+      }
+    } else if (user) {
       const defaultDisplayName = user.email ? user.email.split('@')[0] : (user.displayName || "사용자");
       setDisplayName(defaultDisplayName);
       setOriginalDisplayName(defaultDisplayName);
       const defaultUsername = user.displayName || "사용자";
       setUsername(defaultUsername);
       setOriginalUsername(defaultUsername);
-      fetchLinks(user.uid);
-      fetchUserProfile(user.uid);
+      setBio("한 줄 소개를 입력해주세요");
+      setOriginalBio("한 줄 소개를 입력해주세요");
     } else {
-      setLinks([]);
-      setBio("");
-      setOriginalBio("");
-      setDisplayName("");
-      setOriginalDisplayName("");
-      setUsername("");
-      setOriginalUsername("");
+      setBio(""); setOriginalBio("");
+      setDisplayName(""); setOriginalDisplayName("");
+      setUsername(""); setOriginalUsername("");
     }
-  }, [user]);
+  }, [userProfile, user]);
 
   const visibleLinks = links.filter(link => link.isVisible);
 
-  const handleUsernameSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-    
-    const newUsername = username.trim();
-    if (!newUsername) {
-      toast.error("이름을 입력해주세요.");
-      return;
-    }
-    
-    if (newUsername === originalUsername) {
-      setIsEditingUsername(false);
-      return;
-    }
-    
-    setIsUpdatingUsername(true);
-    try {
-      await updateDoc(doc(db, "users", user.uid), {
-        username: newUsername,
-        updatedAt: serverTimestamp()
-      });
+  const updateUsernameMutation = useMutation({
+    mutationFn: async (newUsername: string) => {
+      if (!user) throw new Error("Not authenticated");
+      await updateDoc(doc(db, "users", user.uid), { username: newUsername, updatedAt: serverTimestamp() });
+      return newUsername;
+    },
+    onSuccess: (newUsername) => {
       setOriginalUsername(newUsername);
       setIsEditingUsername(false);
       toast.success("이름이 변경되었습니다.");
-    } catch (error) {
-      console.error("Error updating username: ", error);
-      toast.error("이름 수정 중 오류가 발생했습니다.");
-    } finally {
-      setIsUpdatingUsername(false);
-    }
+      queryClient.invalidateQueries({ queryKey: ['userProfile', user?.uid] });
+    },
+    onError: () => toast.error("이름 수정 중 오류가 발생했습니다.")
+  });
+
+  const handleUsernameSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newUsername = username.trim();
+    if (!newUsername) return toast.error("이름을 입력해주세요.");
+    if (newUsername === originalUsername) return setIsEditingUsername(false);
+    updateUsernameMutation.mutate(newUsername);
   };
 
-  const handleNameSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-    
-    const newName = displayName.trim();
-    if (!newName) {
-      toast.error("닉네임을 입력해주세요.");
-      return;
-    }
-    
-    if (newName === originalDisplayName) {
-      setIsEditingName(false);
-      return;
-    }
-    
-    setIsUpdatingName(true);
-    try {
+  const updateDisplayNameMutation = useMutation({
+    mutationFn: async (newName: string) => {
+      if (!user) throw new Error("Not authenticated");
       const q = query(collection(db, "users"), where("displayName", "==", newName));
-      const querySnapshot = await getDocs(q);
-      
+      const snapshot = await getDocs(q);
       let isDuplicate = false;
-      querySnapshot.forEach((docSnap) => {
-        if (docSnap.id !== user.uid) {
-          isDuplicate = true;
-        }
-      });
-
-      if (isDuplicate) {
-        toast.error("이미 사용 중인 닉네임입니다.");
-        setIsUpdatingName(false);
-        return;
-      }
-
-      await updateDoc(doc(db, "users", user.uid), {
-        displayName: newName,
-        updatedAt: serverTimestamp()
-      });
+      snapshot.forEach(d => { if (d.id !== user.uid) isDuplicate = true; });
+      if (isDuplicate) throw new Error("DUPLICATE");
+      await updateDoc(doc(db, "users", user.uid), { displayName: newName, updatedAt: serverTimestamp() });
+      return newName;
+    },
+    onSuccess: (newName) => {
       setOriginalDisplayName(newName);
       setIsEditingName(false);
       toast.success("닉네임이 변경되었습니다.");
-    } catch (error) {
-      console.error("Error updating display name: ", error);
-      toast.error("닉네임 수정 중 오류가 발생했습니다.");
-    } finally {
-      setIsUpdatingName(false);
+      queryClient.invalidateQueries({ queryKey: ['userProfile', user?.uid] });
+    },
+    onError: (err: Error) => {
+      if (err.message === "DUPLICATE") toast.error("이미 사용 중인 닉네임입니다.");
+      else toast.error("닉네임 수정 중 오류가 발생했습니다.");
     }
+  });
+
+  const handleNameSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newName = displayName.trim();
+    if (!newName) return toast.error("닉네임을 입력해주세요.");
+    if (newName === originalDisplayName) return setIsEditingName(false);
+    updateDisplayNameMutation.mutate(newName);
   };
 
-  const handleBioSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
-    
-    const newBio = bio.trim();
-    if (newBio === originalBio) {
-      setIsEditingBio(false);
-      return;
-    }
-
-    setIsUpdatingBio(true);
-    try {
-      await updateDoc(doc(db, "users", user.uid), {
-        bio: newBio,
-        updatedAt: serverTimestamp()
-      });
+  const updateBioMutation = useMutation({
+    mutationFn: async (newBio: string) => {
+      if (!user) throw new Error("Not authenticated");
+      await updateDoc(doc(db, "users", user.uid), { bio: newBio, updatedAt: serverTimestamp() });
+      return newBio;
+    },
+    onSuccess: (newBio) => {
       setOriginalBio(newBio);
       setIsEditingBio(false);
-    } catch (error) {
-      console.error("Error updating bio: ", error);
-      toast.error("한 줄 소개 수정 중 오류가 발생했습니다.");
-    } finally {
-      setIsUpdatingBio(false);
-    }
+      toast.success("한 줄 소개가 변경되었습니다.");
+      queryClient.invalidateQueries({ queryKey: ['userProfile', user?.uid] });
+    },
+    onError: () => toast.error("한 줄 소개 수정 중 오류가 발생했습니다.")
+  });
+
+  const handleBioSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newBio = bio.trim();
+    if (newBio === originalBio) return setIsEditingBio(false);
+    updateBioMutation.mutate(newBio);
   };
 
-  const onSubmit = async (data: LinkFormValues) => {
-    if (!user) return;
-    setIsAdding(true);
-    const urlTrimmed = data.url.trim();
-    const formattedUrl = urlTrimmed.startsWith("http") ? urlTrimmed : `https://${urlTrimmed}`;
-
-    try {
-      const docRef = await addDoc(collection(db, `users/${user.uid}/links`), {
+  const addLinkMutation = useMutation({
+    mutationFn: async (data: LinkFormValues) => {
+      if (!user) throw new Error("Not authenticated");
+      const urlTrimmed = data.url.trim();
+      const formattedUrl = urlTrimmed.startsWith("http") ? urlTrimmed : `https://${urlTrimmed}`;
+      await addDoc(collection(db, `users/${user.uid}/links`), {
         title: data.title.trim(),
         url: formattedUrl,
         isVisible: true,
@@ -314,72 +259,65 @@ export default function Home() {
         icon: "Link",
         createdAt: serverTimestamp(),
       });
-
-      const newLink: LinkItem = {
-        id: docRef.id,
-        title: data.title.trim(),
-        url: formattedUrl,
-        isVisible: true,
-        order: links.length,
-        animation: "none",
-        icon: "Link",
-      };
-
-      setLinks([newLink, ...links]);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['links', user?.uid] });
       form.reset();
       setIsDialogOpen(false);
-    } catch (e) {
-      console.error("Error adding document: ", e);
-      toast.error("링크 추가 중 오류가 발생했습니다.");
-    } finally {
-      setIsAdding(false);
-    }
-  };
+    },
+    onError: () => toast.error("링크 추가 중 오류가 발생했습니다.")
+  });
 
-  const handleUpdateLink = async (id: string, data: LinkFormValues) => {
-    if (!user) return;
-    const urlTrimmed = data.url.trim();
-    const formattedUrl = urlTrimmed.startsWith("http") ? urlTrimmed : `https://${urlTrimmed}`;
+  const onSubmit = (data: LinkFormValues) => addLinkMutation.mutate(data);
 
-    try {
+  const updateLinkMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string, data: LinkFormValues }) => {
+      if (!user) throw new Error("Not authenticated");
+      const urlTrimmed = data.url.trim();
+      const formattedUrl = urlTrimmed.startsWith("http") ? urlTrimmed : `https://${urlTrimmed}`;
       await updateDoc(doc(db, `users/${user.uid}/links`, id), {
         title: data.title.trim(),
         url: formattedUrl,
         updatedAt: serverTimestamp(),
       });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['links', user?.uid] });
+    },
+    onError: () => toast.error("링크 수정 중 오류가 발생했습니다.")
+  });
 
-      setLinks(links.map(link => 
-        link.id === id 
-          ? { ...link, title: data.title.trim(), url: formattedUrl } 
-          : link
-      ));
-    } catch (e) {
-      console.error("Error updating document: ", e);
-      toast.error("링크 수정 중 오류가 발생했습니다.");
-    }
+  const handleUpdateLink = async (id: string, data: LinkFormValues) => {
+    updateLinkMutation.mutate({ id, data });
   };
 
-  const handleDeleteLink = async () => {
-    if (!deletingLink || !user) return;
-    setIsDeleting(true);
-    try {
-      await deleteDoc(doc(db, `users/${user.uid}/links`, deletingLink.id));
-      setLinks(links.filter(link => link.id !== deletingLink.id));
+  const deleteLinkMutation = useMutation({
+    mutationFn: async (id: string) => {
+      if (!user) throw new Error("Not authenticated");
+      await deleteDoc(doc(db, `users/${user.uid}/links`, id));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['links', user?.uid] });
       setDeletingLink(null);
-    } catch (e) {
-      console.error("Error deleting document: ", e);
-      toast.error("링크 삭제 중 오류가 발생했습니다.");
-    } finally {
-      setIsDeleting(false);
-    }
+    },
+    onError: () => toast.error("링크 삭제 중 오류가 발생했습니다.")
+  });
+
+  const handleDeleteLink = () => {
+    if (deletingLink) deleteLinkMutation.mutate(deletingLink.id);
   };
 
   const handleOpenChange = (open: boolean) => {
     setIsDialogOpen(open);
-    if (!open) {
-      form.reset();
-    }
+    if (!open) form.reset();
   };
+
+  const isUpdatingUsername = updateUsernameMutation.isPending;
+  const isUpdatingName = updateDisplayNameMutation.isPending;
+  const isUpdatingBio = updateBioMutation.isPending;
+  const isAdding = addLinkMutation.isPending;
+  const isDeleting = deleteLinkMutation.isPending;
+  const isLoading = isLinksLoading;
 
   return (
     <main className="flex min-h-svh flex-col items-center p-6 bg-zinc-50 text-zinc-900 overflow-hidden">
@@ -388,15 +326,25 @@ export default function Home() {
           MyLink
         </div>
         {user ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger className="relative flex items-center justify-center h-10 w-10 rounded-full bg-zinc-100 p-0 overflow-hidden border border-zinc-200 outline-none hover:bg-zinc-200 transition-colors focus-visible:ring-2 focus-visible:ring-zinc-500 shadow-sm cursor-pointer">
-              {user.photoURL ? (
-                <img src={user.photoURL} alt="Profile" className="h-full w-full object-cover" />
-              ) : (
-                <PhosphorIcons.User className="h-5 w-5 text-zinc-500" />
-              )}
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 bg-white border-zinc-200 shadow-lg rounded-xl">
+          <div className="flex items-center gap-2">
+            <Link href={`/${displayName}`} target="_blank">
+              <Button variant="outline" size="sm" className="hidden sm:flex gap-1.5 border-zinc-200 hover:bg-zinc-100 text-zinc-700 h-9 px-3 text-xs font-semibold rounded-full shadow-sm">
+                <PhosphorIcons.Eye className="h-4 w-4" />
+                내 페이지 미리보기
+              </Button>
+              <Button variant="outline" size="icon" className="sm:hidden border-zinc-200 hover:bg-zinc-100 text-zinc-700 h-9 w-9 rounded-full shadow-sm">
+                <PhosphorIcons.Eye className="h-4 w-4" />
+              </Button>
+            </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="relative flex items-center justify-center h-10 w-10 rounded-full bg-zinc-100 p-0 overflow-hidden border border-zinc-200 outline-none hover:bg-zinc-200 transition-colors focus-visible:ring-2 focus-visible:ring-zinc-500 shadow-sm cursor-pointer">
+                {user.photoURL ? (
+                  <img src={user.photoURL} alt="Profile" className="h-full w-full object-cover" />
+                ) : (
+                  <PhosphorIcons.User className="h-5 w-5 text-zinc-500" />
+                )}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 bg-white border-zinc-200 shadow-lg rounded-xl">
               <DropdownMenuGroup>
                 <DropdownMenuLabel className="font-normal py-3">
                   <div className="flex flex-col space-y-1.5">
@@ -411,10 +359,12 @@ export default function Home() {
                   <PhosphorIcons.Copy className="mr-2 h-4 w-4 text-zinc-500" />
                   <span>내 페이지 링크 복사</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem className="cursor-pointer py-2 focus:bg-zinc-50" onClick={() => toast.info("준비 중인 기능입니다.")}>
-                  <PhosphorIcons.Link className="mr-2 h-4 w-4 text-zinc-500" />
-                  <span>내 퍼블릭 프로필 보기</span>
-                </DropdownMenuItem>
+                <Link href={`/${displayName}`} target="_blank" className="w-full">
+                  <DropdownMenuItem className="cursor-pointer py-2 focus:bg-zinc-50">
+                    <PhosphorIcons.Link className="mr-2 h-4 w-4 text-zinc-500" />
+                    <span>내 퍼블릭 프로필 보기</span>
+                  </DropdownMenuItem>
+                </Link>
                 <DropdownMenuItem className="cursor-pointer py-2 focus:bg-zinc-50" onClick={() => toast.info("준비 중인 기능입니다.")}>
                   <PhosphorIcons.ChartBar className="mr-2 h-4 w-4 text-zinc-500" />
                   <span>방문자 통계</span>
@@ -445,6 +395,7 @@ export default function Home() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         ) : (
           <Button onClick={handleLogin} className="bg-zinc-900 text-zinc-50 hover:bg-zinc-800 font-semibold px-6 shadow-sm">
             로그인
