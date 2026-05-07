@@ -14,7 +14,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
-import { collection, addDoc, serverTimestamp, query, orderBy, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, query, orderBy, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, where } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User } from "firebase/auth";
 import { toast } from "sonner";
@@ -53,8 +53,17 @@ export default function Home() {
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [bio, setBio] = useState<string>("");
+  const [originalBio, setOriginalBio] = useState<string>("");
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [isUpdatingBio, setIsUpdatingBio] = useState(false);
+  const [displayName, setDisplayName] = useState<string>("");
+  const [originalDisplayName, setOriginalDisplayName] = useState<string>("");
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [isUpdatingName, setIsUpdatingName] = useState(false);
+  const [username, setUsername] = useState<string>("");
+  const [originalUsername, setOriginalUsername] = useState<string>("");
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
+  const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
 
   // React Hook Form implementation
   const form = useForm<LinkFormValues>({
@@ -81,6 +90,7 @@ export default function Home() {
       await setDoc(doc(db, "users", loggedInUser.uid), {
         uid: loggedInUser.uid,
         email: loggedInUser.email,
+        username: loggedInUser.displayName || "사용자",
         displayName: emailPrefix,
         photoURL: loggedInUser.photoURL,
         bio: "한 줄 소개를 입력해주세요",
@@ -136,10 +146,23 @@ export default function Home() {
     try {
       const docRef = doc(db, "users", uid);
       const docSnap = await getDoc(docRef);
-      if (docSnap.exists() && docSnap.data().bio) {
-        setBio(docSnap.data().bio);
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.username) {
+          setUsername(data.username);
+          setOriginalUsername(data.username);
+        }
+        if (data.bio) {
+          setBio(data.bio);
+          setOriginalBio(data.bio);
+        }
+        if (data.displayName) {
+          setDisplayName(data.displayName);
+          setOriginalDisplayName(data.displayName);
+        }
       } else {
         setBio("한 줄 소개를 입력해주세요");
+        setOriginalBio("한 줄 소개를 입력해주세요");
       }
     } catch (error) {
       console.error("Error fetching user profile: ", error);
@@ -148,25 +171,124 @@ export default function Home() {
 
   useEffect(() => {
     if (user) {
+      const defaultDisplayName = user.email ? user.email.split('@')[0] : (user.displayName || "사용자");
+      setDisplayName(defaultDisplayName);
+      setOriginalDisplayName(defaultDisplayName);
+      const defaultUsername = user.displayName || "사용자";
+      setUsername(defaultUsername);
+      setOriginalUsername(defaultUsername);
       fetchLinks(user.uid);
       fetchUserProfile(user.uid);
     } else {
       setLinks([]);
       setBio("");
+      setOriginalBio("");
+      setDisplayName("");
+      setOriginalDisplayName("");
+      setUsername("");
+      setOriginalUsername("");
     }
   }, [user]);
 
   const visibleLinks = links.filter(link => link.isVisible);
 
+  const handleUsernameSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    
+    const newUsername = username.trim();
+    if (!newUsername) {
+      toast.error("이름을 입력해주세요.");
+      return;
+    }
+    
+    if (newUsername === originalUsername) {
+      setIsEditingUsername(false);
+      return;
+    }
+    
+    setIsUpdatingUsername(true);
+    try {
+      await updateDoc(doc(db, "users", user.uid), {
+        username: newUsername,
+        updatedAt: serverTimestamp()
+      });
+      setOriginalUsername(newUsername);
+      setIsEditingUsername(false);
+      toast.success("이름이 변경되었습니다.");
+    } catch (error) {
+      console.error("Error updating username: ", error);
+      toast.error("이름 수정 중 오류가 발생했습니다.");
+    } finally {
+      setIsUpdatingUsername(false);
+    }
+  };
+
+  const handleNameSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    
+    const newName = displayName.trim();
+    if (!newName) {
+      toast.error("닉네임을 입력해주세요.");
+      return;
+    }
+    
+    if (newName === originalDisplayName) {
+      setIsEditingName(false);
+      return;
+    }
+    
+    setIsUpdatingName(true);
+    try {
+      const q = query(collection(db, "users"), where("displayName", "==", newName));
+      const querySnapshot = await getDocs(q);
+      
+      let isDuplicate = false;
+      querySnapshot.forEach((docSnap) => {
+        if (docSnap.id !== user.uid) {
+          isDuplicate = true;
+        }
+      });
+
+      if (isDuplicate) {
+        toast.error("이미 사용 중인 닉네임입니다.");
+        setIsUpdatingName(false);
+        return;
+      }
+
+      await updateDoc(doc(db, "users", user.uid), {
+        displayName: newName,
+        updatedAt: serverTimestamp()
+      });
+      setOriginalDisplayName(newName);
+      setIsEditingName(false);
+      toast.success("닉네임이 변경되었습니다.");
+    } catch (error) {
+      console.error("Error updating display name: ", error);
+      toast.error("닉네임 수정 중 오류가 발생했습니다.");
+    } finally {
+      setIsUpdatingName(false);
+    }
+  };
+
   const handleBioSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    
+    const newBio = bio.trim();
+    if (newBio === originalBio) {
+      setIsEditingBio(false);
+      return;
+    }
+
     setIsUpdatingBio(true);
     try {
       await updateDoc(doc(db, "users", user.uid), {
-        bio: bio.trim(),
+        bio: newBio,
         updatedAt: serverTimestamp()
       });
+      setOriginalBio(newBio);
       setIsEditingBio(false);
     } catch (error) {
       console.error("Error updating bio: ", error);
@@ -278,8 +400,8 @@ export default function Home() {
               <DropdownMenuGroup>
                 <DropdownMenuLabel className="font-normal py-3">
                   <div className="flex flex-col space-y-1.5">
-                    <p className="text-sm font-semibold leading-none text-zinc-900">{user.email ? user.email.split('@')[0] : (user.displayName || "사용자")}</p>
-                    <p className="text-xs leading-none text-zinc-500">{user.email}</p>
+                    <p className="text-sm font-semibold leading-none text-zinc-900">{username}</p>
+                    <p className="text-xs leading-none text-zinc-500">@{displayName}</p>
                   </div>
                 </DropdownMenuLabel>
               </DropdownMenuGroup>
@@ -385,13 +507,64 @@ export default function Home() {
                  </div>
                )}
             </div>
-            <div className="space-y-2">
-              <h1 className="text-2xl font-bold tracking-tight text-zinc-900">
-                {user.email ? user.email.split('@')[0] : (user.displayName || "사용자")}
-              </h1>
-              <p className="text-sm font-medium text-zinc-500">
-                {user.email}
-              </p>
+            <div className="space-y-1">
+              <div className="flex justify-center items-center">
+                {isEditingUsername ? (
+                  <form onSubmit={handleUsernameSubmit} className="flex items-center space-x-2">
+                    <Input 
+                      value={username} 
+                      onChange={(e) => setUsername(e.target.value)} 
+                      placeholder="이름을 입력해주세요"
+                      className="h-10 text-xl font-bold text-center border-zinc-300 focus-visible:ring-zinc-500 w-48"
+                      autoFocus
+                      disabled={isUpdatingUsername}
+                    />
+                    <Button type="submit" size="sm" className="h-10 px-3 bg-zinc-900 text-zinc-50 hover:bg-zinc-800" disabled={isUpdatingUsername}>
+                      {isUpdatingUsername ? <PhosphorIcons.Spinner className="w-4 h-4 animate-spin" /> : "저장"}
+                    </Button>
+                  </form>
+                ) : (
+                  <div 
+                    className="group flex items-center justify-center gap-1.5 cursor-pointer hover:bg-zinc-100 px-3 py-1 rounded-lg transition-colors border border-transparent hover:border-zinc-200"
+                    onClick={() => setIsEditingUsername(true)}
+                    title="클릭하여 이름 수정"
+                  >
+                    <h1 className="text-2xl font-bold tracking-tight text-zinc-900">
+                      {username}
+                    </h1>
+                    <PhosphorIcons.PencilSimple className="w-5 h-5 text-zinc-400 group-hover:text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-center items-center">
+                {isEditingName ? (
+                  <form onSubmit={handleNameSubmit} className="flex items-center space-x-1">
+                    <span className="text-zinc-500 font-medium">@</span>
+                    <Input 
+                      value={displayName} 
+                      onChange={(e) => setDisplayName(e.target.value)} 
+                      placeholder="닉네임을 입력해주세요"
+                      className="h-8 text-sm font-medium text-center border-zinc-300 focus-visible:ring-zinc-500 w-32"
+                      autoFocus
+                      disabled={isUpdatingName}
+                    />
+                    <Button type="submit" size="sm" className="h-8 px-2 bg-zinc-900 text-zinc-50 hover:bg-zinc-800" disabled={isUpdatingName}>
+                      {isUpdatingName ? <PhosphorIcons.Spinner className="w-4 h-4 animate-spin" /> : "저장"}
+                    </Button>
+                  </form>
+                ) : (
+                  <div 
+                    className="group flex items-center justify-center gap-1 cursor-pointer hover:bg-zinc-100 px-2 py-1 rounded-md transition-colors border border-transparent hover:border-zinc-200"
+                    onClick={() => setIsEditingName(true)}
+                    title="클릭하여 닉네임 수정"
+                  >
+                    <p className="text-sm font-medium text-zinc-500">
+                      @{displayName}
+                    </p>
+                    <PhosphorIcons.PencilSimple className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                )}
+              </div>
               
               {/* Bio Section */}
               <div className="pt-3 flex justify-center pb-2">
