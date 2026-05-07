@@ -17,6 +17,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { collection, addDoc, serverTimestamp, query, orderBy, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User } from "firebase/auth";
+import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // Zod Schema Definition
 const linkSchema = z.object({
@@ -78,7 +88,7 @@ export default function Home() {
       }, { merge: true });
     } catch (error) {
       console.error("Login failed", error);
-      alert("로그인에 실패했습니다.");
+      toast.error("로그인에 실패했습니다.");
     }
   };
 
@@ -88,6 +98,15 @@ export default function Home() {
     } catch (error) {
       console.error("Logout failed", error);
     }
+  };
+
+  const handleCopyProfileLink = () => {
+    if (!user) return;
+    // 임시로 user.uid를 경로로 사용
+    const profileUrl = `${window.location.origin}/${user.uid}`;
+    navigator.clipboard.writeText(profileUrl)
+      .then(() => toast.success("프로필 링크가 복사되었습니다!"))
+      .catch((err) => console.error("Failed to copy link: ", err));
   };
 
   const fetchLinks = async (uid: string) => {
@@ -151,7 +170,7 @@ export default function Home() {
       setIsEditingBio(false);
     } catch (error) {
       console.error("Error updating bio: ", error);
-      alert("한 줄 소개 수정 중 오류가 발생했습니다.");
+      toast.error("한 줄 소개 수정 중 오류가 발생했습니다.");
     } finally {
       setIsUpdatingBio(false);
     }
@@ -189,7 +208,7 @@ export default function Home() {
       setIsDialogOpen(false);
     } catch (e) {
       console.error("Error adding document: ", e);
-      alert("링크 추가 중 오류가 발생했습니다.");
+      toast.error("링크 추가 중 오류가 발생했습니다.");
     } finally {
       setIsAdding(false);
     }
@@ -214,7 +233,7 @@ export default function Home() {
       ));
     } catch (e) {
       console.error("Error updating document: ", e);
-      alert("링크 수정 중 오류가 발생했습니다.");
+      toast.error("링크 수정 중 오류가 발생했습니다.");
     }
   };
 
@@ -227,7 +246,7 @@ export default function Home() {
       setDeletingLink(null);
     } catch (e) {
       console.error("Error deleting document: ", e);
-      alert("링크 삭제 중 오류가 발생했습니다.");
+      toast.error("링크 삭제 중 오류가 발생했습니다.");
     } finally {
       setIsDeleting(false);
     }
@@ -247,9 +266,63 @@ export default function Home() {
           MyLink
         </div>
         {user ? (
-          <Button variant="outline" onClick={handleLogout} className="border-zinc-200 text-zinc-700 bg-white shadow-sm font-semibold">
-            로그아웃
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger className="relative flex items-center justify-center h-10 w-10 rounded-full bg-zinc-100 p-0 overflow-hidden border border-zinc-200 outline-none hover:bg-zinc-200 transition-colors focus-visible:ring-2 focus-visible:ring-zinc-500 shadow-sm cursor-pointer">
+              {user.photoURL ? (
+                <img src={user.photoURL} alt="Profile" className="h-full w-full object-cover" />
+              ) : (
+                <PhosphorIcons.User className="h-5 w-5 text-zinc-500" />
+              )}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 bg-white border-zinc-200 shadow-lg rounded-xl">
+              <DropdownMenuGroup>
+                <DropdownMenuLabel className="font-normal py-3">
+                  <div className="flex flex-col space-y-1.5">
+                    <p className="text-sm font-semibold leading-none text-zinc-900">{user.email ? user.email.split('@')[0] : (user.displayName || "사용자")}</p>
+                    <p className="text-xs leading-none text-zinc-500">{user.email}</p>
+                  </div>
+                </DropdownMenuLabel>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator className="bg-zinc-100" />
+              <DropdownMenuGroup>
+                <DropdownMenuItem className="cursor-pointer py-2 focus:bg-zinc-50" onClick={handleCopyProfileLink}>
+                  <PhosphorIcons.Copy className="mr-2 h-4 w-4 text-zinc-500" />
+                  <span>내 페이지 링크 복사</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer py-2 focus:bg-zinc-50" onClick={() => toast.info("준비 중인 기능입니다.")}>
+                  <PhosphorIcons.Link className="mr-2 h-4 w-4 text-zinc-500" />
+                  <span>내 퍼블릭 프로필 보기</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer py-2 focus:bg-zinc-50" onClick={() => toast.info("준비 중인 기능입니다.")}>
+                  <PhosphorIcons.ChartBar className="mr-2 h-4 w-4 text-zinc-500" />
+                  <span>방문자 통계</span>
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator className="bg-zinc-100" />
+              <DropdownMenuGroup>
+                <DropdownMenuItem className="cursor-pointer py-2 focus:bg-zinc-50" onClick={() => toast.info("준비 중인 기능입니다.")}>
+                  <PhosphorIcons.PaintBrush className="mr-2 h-4 w-4 text-zinc-500" />
+                  <span>디자인 및 테마 설정</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer py-2 focus:bg-zinc-50" onClick={() => toast.info("준비 중인 기능입니다.")}>
+                  <PhosphorIcons.Gear className="mr-2 h-4 w-4 text-zinc-500" />
+                  <span>계정 설정</span>
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator className="bg-zinc-100" />
+              <DropdownMenuGroup>
+                <DropdownMenuItem className="cursor-pointer py-2 focus:bg-zinc-50" onClick={() => toast.info("준비 중인 기능입니다.")}>
+                  <PhosphorIcons.Question className="mr-2 h-4 w-4 text-zinc-500" />
+                  <span>도움말 및 문의</span>
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator className="bg-zinc-100" />
+              <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:bg-red-50 focus:text-red-600 cursor-pointer py-2">
+                <PhosphorIcons.SignOut className="mr-2 h-4 w-4" />
+                <span>로그아웃</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         ) : (
           <Button onClick={handleLogin} className="bg-zinc-900 text-zinc-50 hover:bg-zinc-800 font-semibold px-6 shadow-sm">
             로그인
