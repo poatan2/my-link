@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 로그인 여부를 확인하는 공통 헬퍼 함수
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // 요청한 유저가 해당 경로의 소유자인지 확인하는 공통 헬퍼 함수
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // users 컬렉션 보안 규칙
+    match /users/{userId} {
+      // 누구나 사용자의 프로필 조회 및 닉네임 중복 여부를 확인할 수 있어야 하므로 전체 읽기 허용
+      allow read, list: if true;
+      
+      // 프로필 생성, 수정, 삭제는 오직 로그인한 본인(UID가 일치하는 유저)만 가능
+      allow write: if isOwner(userId);
+
+      // links 하위 컬렉션 보안 규칙 (사용자별 개별 링크 목록)
+      match /links/{linkId} {
+        // 방문자나 본인이 공개된 링크들을 리스트 형태로 렌더링하고 읽을 수 있도록 읽기 전체 허용
+        allow read, list: if true;
+        
+        // 링크 생성, 수정, 삭제는 오직 로그인한 본인만 가능
+        allow write: if isOwner(userId);
+      }
+    }
+  }
+}

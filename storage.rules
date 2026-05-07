@@ -1,0 +1,29 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // 로그인 여부를 확인하는 공통 헬퍼 함수
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // 요청한 유저가 폴더의 소유자(UID가 일치하는 유저)인지 확인하는 헬퍼 함수
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // 사용자의 개인 업로드 공간 (users/본인UID/하위파일)
+    match /users/{userId}/{allPaths=**} {
+      // 업로드한 프로필 사진은 모든 방문자가 볼 수 있어야 하므로 전체 읽기 허용
+      allow read: if true;
+      
+      // 프로필 사진의 업로드, 변경, 삭제는 오직 로그인한 본인만 가능
+      // 보안성 및 저장 공간 절약을 위해 다음 사항을 규칙 수준에서 검증:
+      // 1. 이미지 파일 형식만 업로드 허용 (MIME 타입 검사)
+      // 2. 단일 파일 용량은 최대 5MB로 제한
+      allow write: if isOwner(userId)
+                    && request.resource.size < 5 * 1024 * 1024
+                    && request.resource.contentType.matches('image/.*');
+    }
+  }
+}
