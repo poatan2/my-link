@@ -14,8 +14,9 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
-import { collection, addDoc, serverTimestamp, query, orderBy, getDocs, doc, updateDoc, deleteDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { collection, addDoc, serverTimestamp, query, orderBy, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc } from "firebase/firestore";
+import { db, auth } from "@/lib/firebase";
+import { GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User } from "firebase/auth";
 
 // Zod Schema Definition
 const linkSchema = z.object({
@@ -39,6 +40,11 @@ export default function Home() {
   const [isAdding, setIsAdding] = useState(false);
   const [deletingLink, setDeletingLink] = useState<LinkItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [bio, setBio] = useState<string>("");
+  const [isEditingBio, setIsEditingBio] = useState(false);
+  const [isUpdatingBio, setIsUpdatingBio] = useState(false);
 
   // React Hook Form implementation
   const form = useForm<LinkFormValues>({
@@ -46,11 +52,49 @@ export default function Home() {
     defaultValues: { title: "", url: "" },
   });
 
-  const fetchLinks = async () => {
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogin = async () => {
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
+      const loggedInUser = result.user;
+      const emailPrefix = loggedInUser.email ? loggedInUser.email.split('@')[0] : loggedInUser.displayName;
+      
+      // Save user to Firestore users collection
+      await setDoc(doc(db, "users", loggedInUser.uid), {
+        uid: loggedInUser.uid,
+        email: loggedInUser.email,
+        displayName: emailPrefix,
+        photoURL: loggedInUser.photoURL,
+        bio: "한 줄 소개를 입력해주세요",
+        lastLoginAt: serverTimestamp(),
+      }, { merge: true });
+    } catch (error) {
+      console.error("Login failed", error);
+      alert("로그인에 실패했습니다.");
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Logout failed", error);
+    }
+  };
+
+  const fetchLinks = async (uid: string) => {
     setIsLoading(true);
     try {
       const q = query(
-        collection(db, "users/anonymous/links"),
+        collection(db, `users/${uid}/links`),
         orderBy("createdAt", "desc")
       );
       const snapshot = await getDocs(q);
@@ -69,19 +113,58 @@ export default function Home() {
     }
   };
 
+  const fetchUserProfile = async (uid: string) => {
+    try {
+      const docRef = doc(db, "users", uid);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists() && docSnap.data().bio) {
+        setBio(docSnap.data().bio);
+      } else {
+        setBio("한 줄 소개를 입력해주세요");
+      }
+    } catch (error) {
+      console.error("Error fetching user profile: ", error);
+    }
+  };
+
   useEffect(() => {
-    fetchLinks();
-  }, []);
+    if (user) {
+      fetchLinks(user.uid);
+      fetchUserProfile(user.uid);
+    } else {
+      setLinks([]);
+      setBio("");
+    }
+  }, [user]);
 
   const visibleLinks = links.filter(link => link.isVisible);
 
+  const handleBioSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setIsUpdatingBio(true);
+    try {
+      await updateDoc(doc(db, "users", user.uid), {
+        bio: bio.trim(),
+        updatedAt: serverTimestamp()
+      });
+      setIsEditingBio(false);
+    } catch (error) {
+      console.error("Error updating bio: ", error);
+      alert("한 줄 소개 수정 중 오류가 발생했습니다.");
+    } finally {
+      setIsUpdatingBio(false);
+    }
+  };
+
   const onSubmit = async (data: LinkFormValues) => {
+    if (!user) return;
     setIsAdding(true);
     const urlTrimmed = data.url.trim();
     const formattedUrl = urlTrimmed.startsWith("http") ? urlTrimmed : `https://${urlTrimmed}`;
 
     try {
-      const docRef = await addDoc(collection(db, "users/anonymous/links"), {
+      const docRef = await addDoc(collection(db, `users/${user.uid}/links`), {
         title: data.title.trim(),
         url: formattedUrl,
         isVisible: true,
@@ -113,11 +196,12 @@ export default function Home() {
   };
 
   const handleUpdateLink = async (id: string, data: LinkFormValues) => {
+    if (!user) return;
     const urlTrimmed = data.url.trim();
     const formattedUrl = urlTrimmed.startsWith("http") ? urlTrimmed : `https://${urlTrimmed}`;
 
     try {
-      await updateDoc(doc(db, "users/anonymous/links", id), {
+      await updateDoc(doc(db, `users/${user.uid}/links`, id), {
         title: data.title.trim(),
         url: formattedUrl,
         updatedAt: serverTimestamp(),
@@ -135,10 +219,10 @@ export default function Home() {
   };
 
   const handleDeleteLink = async () => {
-    if (!deletingLink) return;
+    if (!deletingLink || !user) return;
     setIsDeleting(true);
     try {
-      await deleteDoc(doc(db, "users/anonymous/links", deletingLink.id));
+      await deleteDoc(doc(db, `users/${user.uid}/links`, deletingLink.id));
       setLinks(links.filter(link => link.id !== deletingLink.id));
       setDeletingLink(null);
     } catch (e) {
@@ -158,21 +242,114 @@ export default function Home() {
 
   return (
     <main className="flex min-h-svh flex-col items-center p-6 bg-zinc-50 text-zinc-900 overflow-hidden">
-      <div className="w-full max-w-md space-y-10 mt-16 mb-24 relative z-10">
-        <header className="text-center space-y-5">
-          <div className="mx-auto w-24 h-24 rounded-full overflow-hidden bg-white flex items-center justify-center p-0.5 shadow-sm border border-zinc-200 transition-transform duration-500 hover:scale-105">
-             <div className="w-full h-full rounded-full bg-zinc-100 flex items-center justify-center">
-                 <PhosphorIcons.User className="w-10 h-10 text-zinc-400" weight="fill" />
-             </div>
+      <div className="w-full max-w-5xl flex justify-between items-center mb-4 z-20 relative pt-4 px-2">
+        <div className="text-2xl font-black tracking-tighter text-zinc-900">
+          MyLink
+        </div>
+        {user ? (
+          <Button variant="outline" onClick={handleLogout} className="border-zinc-200 text-zinc-700 bg-white shadow-sm font-semibold">
+            로그아웃
+          </Button>
+        ) : (
+          <Button onClick={handleLogin} className="bg-zinc-900 text-zinc-50 hover:bg-zinc-800 font-semibold px-6 shadow-sm">
+            로그인
+          </Button>
+        )}
+      </div>
+
+      {authLoading ? (
+        <div className="flex justify-center items-center py-20 flex-1">
+          <PhosphorIcons.Spinner className="w-8 h-8 text-zinc-300 animate-spin" />
+        </div>
+      ) : !user ? (
+        <div className="flex flex-col items-center justify-center w-full flex-1 animate-in fade-in duration-700 relative z-10 pb-20 mt-4 md:mt-10">
+          <h1 className="text-6xl md:text-8xl font-black tracking-tighter text-zinc-900 mb-6 text-center leading-none">
+            MyLink
+          </h1>
+          <p className="text-zinc-500 text-center text-lg md:text-xl font-medium mb-10 leading-relaxed">
+            나만의 링크를 만들고 관리하려면<br/>구글 계정으로 로그인해주세요.
+          </p>
+          <Button onClick={handleLogin} size="lg" className="h-14 px-8 text-lg bg-zinc-900 text-zinc-50 hover:bg-zinc-800 shadow-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl rounded-full font-semibold">
+            <PhosphorIcons.GoogleLogo className="mr-2 h-6 w-6" /> Google로 시작하기
+          </Button>
+
+          {/* Floating UI Mockup */}
+          <div className="mt-20 relative w-full max-w-md mx-auto perspective-[1000px] select-none pointer-events-none">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-zinc-200 rounded-full blur-3xl opacity-50 mix-blend-multiply"></div>
+            <div className="relative w-full transform transition-transform duration-700 hover:rotate-0 rotate-[2deg] hover:scale-105">
+              <div className="bg-white/80 backdrop-blur-xl border border-zinc-200 p-6 rounded-3xl shadow-2xl">
+                 <div className="flex items-center gap-4 mb-6">
+                   <div className="w-12 h-12 rounded-full bg-zinc-200 animate-pulse"></div>
+                   <div className="space-y-2">
+                     <div className="w-32 h-4 bg-zinc-200 rounded-full animate-pulse"></div>
+                     <div className="w-20 h-3 bg-zinc-100 rounded-full animate-pulse"></div>
+                   </div>
+                 </div>
+                 <div className="space-y-3">
+                   <div className="w-full h-14 bg-zinc-100/80 rounded-2xl border border-zinc-100 flex items-center px-4 gap-3">
+                     <div className="w-6 h-6 rounded-md bg-zinc-200"></div>
+                     <div className="w-40 h-4 bg-zinc-200 rounded-full"></div>
+                   </div>
+                   <div className="w-full h-14 bg-zinc-100/80 rounded-2xl border border-zinc-100 flex items-center px-4 gap-3">
+                     <div className="w-6 h-6 rounded-md bg-zinc-200"></div>
+                     <div className="w-24 h-4 bg-zinc-200 rounded-full"></div>
+                   </div>
+                 </div>
+              </div>
+              <div className="absolute -z-10 top-6 -right-6 w-full h-full bg-zinc-100/50 backdrop-blur-sm border border-zinc-200/50 rounded-3xl rotate-[-4deg]"></div>
+            </div>
           </div>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-bold tracking-tight text-zinc-900">
-              태경 (TaeGyeong)
-            </h1>
-            <p className="text-sm font-medium text-zinc-500">
-              크리에이터를 위한 프리미엄 마이링크
-            </p>
-          </div>
+        </div>
+      ) : (
+        <div className="w-full max-w-md space-y-10 mt-8 mb-24 relative z-10 animate-in fade-in duration-500">
+          <header className="text-center space-y-5">
+            <div className="mx-auto w-24 h-24 rounded-full overflow-hidden bg-white flex items-center justify-center p-0.5 shadow-sm border border-zinc-200 transition-transform duration-500 hover:scale-105">
+               {user.photoURL ? (
+                 <img src={user.photoURL} alt="Profile" className="w-full h-full rounded-full object-cover" />
+               ) : (
+                 <div className="w-full h-full rounded-full bg-zinc-100 flex items-center justify-center">
+                     <PhosphorIcons.User className="w-10 h-10 text-zinc-400" weight="fill" />
+                 </div>
+               )}
+            </div>
+            <div className="space-y-2">
+              <h1 className="text-2xl font-bold tracking-tight text-zinc-900">
+                {user.email ? user.email.split('@')[0] : (user.displayName || "사용자")}
+              </h1>
+              <p className="text-sm font-medium text-zinc-500">
+                {user.email}
+              </p>
+              
+              {/* Bio Section */}
+              <div className="pt-3 flex justify-center pb-2">
+                {isEditingBio ? (
+                  <form onSubmit={handleBioSubmit} className="flex w-full max-w-[280px] items-center space-x-2">
+                    <Input 
+                      value={bio} 
+                      onChange={(e) => setBio(e.target.value)} 
+                      placeholder="한 줄 소개를 입력해주세요"
+                      className="h-9 text-sm text-center border-zinc-300 focus-visible:ring-zinc-500"
+                      autoFocus
+                      disabled={isUpdatingBio}
+                    />
+                    <Button type="submit" size="sm" className="h-9 px-3 bg-zinc-900 text-zinc-50 hover:bg-zinc-800" disabled={isUpdatingBio}>
+                      {isUpdatingBio ? <PhosphorIcons.Spinner className="w-4 h-4 animate-spin" /> : "저장"}
+                    </Button>
+                  </form>
+                ) : (
+                  <div 
+                    className="group flex items-center justify-center gap-1.5 cursor-pointer hover:bg-zinc-100 px-4 py-1.5 rounded-lg transition-colors border border-transparent hover:border-zinc-200"
+                    onClick={() => setIsEditingBio(true)}
+                    title="클릭하여 한 줄 소개 수정"
+                  >
+                    <p className="text-sm text-zinc-700 max-w-[250px] truncate font-medium">
+                      {bio || "한 줄 소개를 입력해주세요"}
+                    </p>
+                    <PhosphorIcons.PencilSimple className="w-4 h-4 text-zinc-400 group-hover:text-zinc-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                )}
+              </div>
+            </div>
 
           <Dialog open={isDialogOpen} onOpenChange={handleOpenChange}>
             <DialogTrigger 
@@ -266,6 +443,12 @@ export default function Home() {
             <div className="flex justify-center items-center py-12">
               <PhosphorIcons.Spinner className="w-8 h-8 text-zinc-300 animate-spin" />
             </div>
+          ) : visibleLinks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-zinc-200 rounded-2xl bg-zinc-50/50 text-zinc-500 text-center space-y-2 mt-2 animate-in fade-in zoom-in-95 duration-300">
+               <PhosphorIcons.LinkBreak className="w-10 h-10 text-zinc-300 mb-2" />
+               <p className="font-semibold text-zinc-700">아직 추가된 링크가 없습니다</p>
+               <p className="text-sm font-medium">위 버튼을 눌러 링크를 추가해보세요!</p>
+            </div>
           ) : (
             visibleLinks.map((link) => (
               <LinkCardItem 
@@ -277,7 +460,8 @@ export default function Home() {
             ))
           )}
         </div>
-      </div>
+        </div>
+      )}
     </main>
   );
 }
