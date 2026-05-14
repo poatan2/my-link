@@ -15,7 +15,13 @@ const fontMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://mylink.com'),
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL 
+      ? process.env.NEXT_PUBLIC_SITE_URL 
+      : process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}` 
+        : 'https://localhost:3000'
+  ),
   title: {
     template: '%s | MyLink',
     default: 'MyLink - 나만의 모든 링크를 하나의 페이지로',
