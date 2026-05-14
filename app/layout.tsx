@@ -16,11 +16,7 @@ const fontMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL 
-      ? process.env.NEXT_PUBLIC_SITE_URL 
-      : process.env.VERCEL_URL 
-        ? `https://${process.env.VERCEL_URL}` 
-        : 'https://localhost:3000'
+    process.env.NEXT_PUBLIC_SITE_URL || 'https://my-link-two.vercel.app'
   ),
   title: {
     template: '%s | MyLink',
@@ -30,7 +26,6 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'MyLink',
     description: '나만의 모든 링크를 하나의 페이지로',
-    url: 'https://mylink.com',
     siteName: 'MyLink',
     locale: 'ko_KR',
     type: 'website',
