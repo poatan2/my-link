@@ -7,6 +7,7 @@ export interface LinkItem {
   isVisible: boolean;
   order: number;
   animation?: "shake" | "pulse" | "none";
+  clicks?: number;
 }
 
 export const DUMMY_LINKS: LinkItem[] = [

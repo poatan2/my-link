@@ -365,10 +365,12 @@ export default function Home() {
                     <span>내 퍼블릭 프로필 보기</span>
                   </DropdownMenuItem>
                 </Link>
-                <DropdownMenuItem className="cursor-pointer py-2 focus:bg-zinc-50" onClick={() => toast.info("준비 중인 기능입니다.")}>
-                  <PhosphorIcons.ChartBar className="mr-2 h-4 w-4 text-zinc-500" />
-                  <span>방문자 통계</span>
-                </DropdownMenuItem>
+                <Link href="/stats" className="w-full">
+                  <DropdownMenuItem className="cursor-pointer py-2 focus:bg-zinc-50">
+                    <PhosphorIcons.ChartBar className="mr-2 h-4 w-4 text-zinc-500" />
+                    <span>방문자 통계</span>
+                  </DropdownMenuItem>
+                </Link>
               </DropdownMenuGroup>
               <DropdownMenuSeparator className="bg-zinc-100" />
               <DropdownMenuGroup>
@@ -769,9 +771,15 @@ function LinkCardItem({
                   <IconComponent weight="duotone" className="w-5 h-5" />
                 </div>
               )}
-              <span className="font-medium text-zinc-700 text-base tracking-wide group-hover:text-zinc-900 transition-colors break-words line-clamp-2">
-                {link.title}
-              </span>
+              <div className="flex flex-col gap-0.5">
+                <span className="font-medium text-zinc-700 text-base tracking-wide group-hover:text-zinc-900 transition-colors break-words line-clamp-2">
+                  {link.title}
+                </span>
+                <div className="flex items-center gap-1 text-zinc-400">
+                  <PhosphorIcons.Eye className="w-3.5 h-3.5" />
+                  <span className="text-xs font-medium">{link.clicks || 0}</span>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

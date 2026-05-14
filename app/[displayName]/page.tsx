@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import { collection, query, where, getDocs, orderBy, doc, updateDoc, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { notFound } from "next/navigation";
 import * as PhosphorIcons from "@phosphor-icons/react";
@@ -53,6 +53,13 @@ export default function PublicProfilePage({ params }: PageProps) {
     },
     enabled: !!profile?.uid,
   });
+
+  const handleLinkClick = (linkId: string) => {
+    if (!profile?.uid) return;
+    updateDoc(doc(db, `users/${profile.uid}/links`, linkId), {
+      clicks: increment(1)
+    }).catch(console.error);
+  };
 
   // Loading state
   if (isProfileLoading) {
@@ -116,6 +123,7 @@ export default function PublicProfilePage({ params }: PageProps) {
                     href={link.url} 
                     target="_blank" 
                     rel="noopener noreferrer"
+                    onClick={() => handleLinkClick(link.id)}
                     className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 rounded-xl block"
                   >
                     <Card className={cn(

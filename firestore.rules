@@ -23,10 +23,14 @@ service cloud.firestore {
       // links 하위 컬렉션 보안 규칙 (사용자별 개별 링크 목록)
       match /links/{linkId} {
         // 방문자나 본인이 공개된 링크들을 리스트 형태로 렌더링하고 읽을 수 있도록 읽기 전체 허용
-        allow read, list: if true;
+        allow read: if true;
         
-        // 링크 생성, 수정, 삭제는 오직 로그인한 본인만 가능
-        allow write: if isOwner(userId);
+        // 링크 생성, 삭제는 오직 로그인한 본인만 가능
+        allow create, delete: if isOwner(userId);
+        
+        // 링크 수정은 본인이거나, 변경되는 필드가 오직 'clicks'뿐인 경우(방문자 클릭) 허용
+        allow update: if isOwner(userId) || 
+                      (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clicks']));
       }
     }
   }
