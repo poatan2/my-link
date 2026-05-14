@@ -410,41 +410,88 @@ export default function Home() {
           <PhosphorIcons.Spinner className="w-8 h-8 text-zinc-300 animate-spin" />
         </div>
       ) : !user ? (
-        <div className="flex flex-col items-center justify-center w-full flex-1 animate-in fade-in duration-700 relative z-10 pb-20 mt-4 md:mt-10">
-          <h1 className="text-6xl md:text-8xl font-black tracking-tighter text-zinc-900 mb-6 text-center leading-none">
-            MyLink
-          </h1>
-          <p className="text-zinc-500 text-center text-lg md:text-xl font-medium mb-10 leading-relaxed">
-            나만의 링크를 만들고 관리하려면<br/>구글 계정으로 로그인해주세요.
-          </p>
-          <Button onClick={handleLogin} size="lg" className="h-14 px-8 text-lg bg-zinc-900 text-zinc-50 hover:bg-zinc-800 shadow-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl rounded-full font-semibold">
-            <PhosphorIcons.GoogleLogo className="mr-2 h-6 w-6" /> Google로 시작하기
-          </Button>
+        <div className="flex flex-col items-center justify-center w-full flex-1 relative z-10 pb-20 pt-10 md:pt-20">
+          {/* Fun Background Elements */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10">
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-100/40 rounded-full blur-[120px]"></div>
+            <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-100/40 rounded-full blur-[120px]"></div>
+            
+            {/* Floating Icons */}
+            <PhosphorIcons.InstagramLogo weight="duotone" className="absolute top-[20%] left-[15%] w-12 h-12 text-pink-400 opacity-60 animate-float hidden sm:block" />
+            <PhosphorIcons.GithubLogo weight="duotone" className="absolute top-[15%] right-[20%] w-14 h-14 text-zinc-700 opacity-60 animate-float-delayed hidden sm:block" />
+            <PhosphorIcons.TwitterLogo weight="duotone" className="absolute bottom-[30%] left-[25%] w-10 h-10 text-sky-400 opacity-60 animate-float-slow hidden sm:block" />
+            <PhosphorIcons.Link weight="duotone" className="absolute bottom-[25%] right-[15%] w-16 h-16 text-emerald-400 opacity-60 animate-float hidden sm:block" />
+            <PhosphorIcons.YoutubeLogo weight="duotone" className="absolute top-[45%] left-[5%] w-12 h-12 text-red-400 opacity-60 animate-float-delayed hidden md:block" />
+            <PhosphorIcons.TiktokLogo weight="duotone" className="absolute top-[50%] right-[8%] w-10 h-10 text-zinc-900 opacity-60 animate-float-slow hidden md:block" />
+          </div>
+
+          <div className="animate-in fade-in slide-in-from-bottom-8 duration-1000 flex flex-col items-center">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-zinc-200 shadow-sm mb-8 animate-bounce">
+              <span className="flex h-2 w-2 rounded-full bg-green-500"></span>
+              <span className="text-xs font-semibold text-zinc-600">지금 바로 시작해보세요!</span>
+            </div>
+            <h1 className="text-5xl md:text-7xl font-black tracking-tighter text-zinc-900 mb-6 text-center leading-tight">
+              나만의 모든 링크를 <br className="hidden md:block" />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 via-zinc-600 to-zinc-400">하나의 페이지로</span>
+            </h1>
+            <p className="text-zinc-500 text-center text-lg md:text-xl font-medium mb-10 leading-relaxed max-w-lg">
+              여러 곳에 흩어져 있는 나의 소셜 미디어, 포트폴리오를 <br className="hidden sm:block" />
+              MyLink에서 쉽고 빠르게 정리하고 공유하세요.
+            </p>
+            <Button onClick={handleLogin} size="lg" className="h-14 px-8 text-lg bg-zinc-900 text-zinc-50 hover:bg-zinc-800 shadow-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl rounded-full font-semibold group">
+              <PhosphorIcons.GoogleLogo className="mr-2 h-6 w-6 group-hover:scale-110 transition-transform duration-300" /> Google로 시작하기
+            </Button>
+          </div>
 
           {/* Floating UI Mockup */}
-          <div className="mt-20 relative w-full max-w-md mx-auto perspective-[1000px] select-none pointer-events-none">
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-zinc-200 rounded-full blur-3xl opacity-50 mix-blend-multiply"></div>
-            <div className="relative w-full transform transition-transform duration-700 hover:rotate-0 rotate-[2deg] hover:scale-105">
-              <div className="bg-white/80 backdrop-blur-xl border border-zinc-200 p-6 rounded-3xl shadow-2xl">
-                 <div className="flex items-center gap-4 mb-6">
-                   <div className="w-12 h-12 rounded-full bg-zinc-200 animate-pulse"></div>
+          <div className="mt-24 relative w-full max-w-md mx-auto perspective-[1000px] select-none pointer-events-none animate-in fade-in zoom-in-95 duration-1000 delay-300 fill-mode-both">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-gradient-to-br from-zinc-200 to-zinc-100 rounded-full blur-3xl opacity-50 mix-blend-multiply animate-pulse"></div>
+            
+            <div className="relative w-full animate-tilt">
+              <div className="bg-white/90 backdrop-blur-xl border border-zinc-200/60 p-6 rounded-[2rem] shadow-2xl relative z-10 overflow-hidden">
+                 {/* Top Bar Mockup */}
+                 <div className="flex items-center gap-4 mb-8">
+                   <div className="w-16 h-16 rounded-full bg-gradient-to-br from-zinc-100 to-zinc-200 border-2 border-white shadow-sm flex items-center justify-center">
+                     <PhosphorIcons.User className="w-8 h-8 text-zinc-400" weight="fill" />
+                   </div>
                    <div className="space-y-2">
-                     <div className="w-32 h-4 bg-zinc-200 rounded-full animate-pulse"></div>
-                     <div className="w-20 h-3 bg-zinc-100 rounded-full animate-pulse"></div>
+                     <div className="w-32 h-5 bg-zinc-800 rounded-full"></div>
+                     <div className="w-48 h-3 bg-zinc-200 rounded-full"></div>
                    </div>
                  </div>
-                 <div className="space-y-3">
-                   <div className="w-full h-14 bg-zinc-100/80 rounded-2xl border border-zinc-100 flex items-center px-4 gap-3">
-                     <div className="w-6 h-6 rounded-md bg-zinc-200"></div>
-                     <div className="w-40 h-4 bg-zinc-200 rounded-full"></div>
+                 
+                 {/* Links Mockup */}
+                 <div className="space-y-4">
+                   <div className="w-full h-16 bg-white rounded-2xl border border-zinc-200 shadow-sm flex items-center px-4 gap-4 transition-transform duration-500 hover:-translate-y-1">
+                     <div className="w-10 h-10 rounded-xl bg-pink-50 flex items-center justify-center">
+                       <PhosphorIcons.InstagramLogo weight="duotone" className="w-6 h-6 text-pink-500" />
+                     </div>
+                     <div className="w-32 h-4 bg-zinc-700 rounded-full"></div>
+                     <div className="ml-auto w-8 h-8 rounded-full bg-zinc-50 flex items-center justify-center">
+                       <PhosphorIcons.ArrowRight className="w-4 h-4 text-zinc-400" />
+                     </div>
                    </div>
-                   <div className="w-full h-14 bg-zinc-100/80 rounded-2xl border border-zinc-100 flex items-center px-4 gap-3">
-                     <div className="w-6 h-6 rounded-md bg-zinc-200"></div>
-                     <div className="w-24 h-4 bg-zinc-200 rounded-full"></div>
+                   <div className="w-full h-16 bg-white rounded-2xl border border-zinc-200 shadow-sm flex items-center px-4 gap-4 transition-transform duration-500 hover:-translate-y-1">
+                     <div className="w-10 h-10 rounded-xl bg-sky-50 flex items-center justify-center">
+                       <PhosphorIcons.TwitterLogo weight="duotone" className="w-6 h-6 text-sky-500" />
+                     </div>
+                     <div className="w-40 h-4 bg-zinc-700 rounded-full"></div>
+                     <div className="ml-auto w-8 h-8 rounded-full bg-zinc-50 flex items-center justify-center">
+                       <PhosphorIcons.ArrowRight className="w-4 h-4 text-zinc-400" />
+                     </div>
+                   </div>
+                   <div className="w-full h-16 bg-white rounded-2xl border border-zinc-200 shadow-sm flex items-center px-4 gap-4 transition-transform duration-500 hover:-translate-y-1">
+                     <div className="w-10 h-10 rounded-xl bg-zinc-100 flex items-center justify-center">
+                       <PhosphorIcons.GithubLogo weight="duotone" className="w-6 h-6 text-zinc-800" />
+                     </div>
+                     <div className="w-24 h-4 bg-zinc-700 rounded-full"></div>
+                     <div className="ml-auto w-8 h-8 rounded-full bg-zinc-50 flex items-center justify-center">
+                       <PhosphorIcons.ArrowRight className="w-4 h-4 text-zinc-400" />
+                     </div>
                    </div>
                  </div>
               </div>
-              <div className="absolute -z-10 top-6 -right-6 w-full h-full bg-zinc-100/50 backdrop-blur-sm border border-zinc-200/50 rounded-3xl rotate-[-4deg]"></div>
+              <div className="absolute -z-10 top-6 -right-6 w-full h-full bg-gradient-to-br from-zinc-100/50 to-zinc-50/50 backdrop-blur-md border border-zinc-200/50 rounded-[2rem] rotate-[-4deg]"></div>
             </div>
           </div>
         </div>
