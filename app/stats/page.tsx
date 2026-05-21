@@ -211,14 +211,14 @@ export default function StatsPage() {
       <div className="w-full max-w-4xl flex flex-col gap-8 z-10">
         <div className="flex flex-col items-center justify-center space-y-2 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="flex items-center gap-3">
-             <Link href="/">
-               <Button variant="outline" size="icon" className="border-zinc-200 hover:bg-zinc-100 text-zinc-700 h-10 w-10 rounded-full shadow-sm transition-transform hover:-translate-x-1">
-                 <PhosphorIcons.ArrowLeft className="h-5 w-5" />
-               </Button>
-             </Link>
-             <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-zinc-900">
-               방문자 통계
-             </h1>
+            <Link href="/">
+              <Button variant="outline" size="icon" className="border-zinc-200 hover:bg-zinc-100 text-zinc-700 h-10 w-10 rounded-full shadow-sm transition-transform hover:-translate-x-1">
+                <PhosphorIcons.ArrowLeft className="h-5 w-5" />
+              </Button>
+            </Link>
+            <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-zinc-900">
+              방문자 통계
+            </h1>
           </div>
           <p className="text-zinc-500 font-medium">프로필 링크의 방문 및 클릭 현황을 분석합니다.</p>
         </div>
@@ -356,28 +356,28 @@ export default function StatsPage() {
                 <ChartContainer config={chartConfig} className="min-h-[250px] w-full">
                   <BarChart data={chartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e4e4e7" opacity={0.5} />
-                    <XAxis 
-                      dataKey="title" 
+                    <XAxis
+                      dataKey="title"
                       tickLine={false}
                       tickMargin={12}
                       axisLine={false}
                       tickFormatter={(value) => value.length > 8 ? value.substring(0, 8) + '...' : value}
                       style={{ fontSize: '12px', fill: '#71717a', fontWeight: 500 }}
                     />
-                    <YAxis 
+                    <YAxis
                       tickLine={false}
                       axisLine={false}
                       tickMargin={10}
                       style={{ fontSize: '12px', fill: '#71717a', fontWeight: 500 }}
                       allowDecimals={false}
                     />
-                    <ChartTooltip 
+                    <ChartTooltip
                       cursor={{ fill: '#f4f4f5', opacity: 0.8 }}
-                      content={<ChartTooltipContent hideLabel className="shadow-lg border-zinc-200 rounded-xl" />} 
+                      content={<ChartTooltipContent hideLabel className="shadow-lg border-zinc-200 rounded-xl" />}
                     />
-                    <Bar 
-                      dataKey="clicks" 
-                      radius={[6, 6, 0, 0]} 
+                    <Bar
+                      dataKey="clicks"
+                      radius={[6, 6, 0, 0]}
                       fill="#18181b"
                       animationDuration={1500}
                     />
